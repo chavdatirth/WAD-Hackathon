@@ -12,12 +12,7 @@ console.log('🗄️ Database: MongoDB (Mongoose)');
 console.log('===============================================================\n');
 
 const isWindows = process.platform === 'win32';
-
-let runnerCmd = isWindows ? 'npm.cmd' : 'npm';
-try {
-  execSync('pnpm -v', { stdio: 'ignore' });
-  runnerCmd = isWindows ? 'pnpm.cmd' : 'pnpm';
-} catch {}
+const runnerCmd = isWindows ? 'npm.cmd' : 'npm';
 
 // 1. Start Backend on Port 5001
 const backend = spawn(runnerCmd, ['run', 'dev'], {
