@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import crypto from 'node:crypto';
 import multer from 'multer';
+import { rateLimit } from 'express-rate-limit';
 import { SecureDocument } from '../models/Document.js';
 import { Case } from '../models/Case.js';
 import { recordAudit } from '../lib/audit.js';
@@ -12,29 +13,13 @@ const upload = multer({
   limits: { fileSize: 30 * 1024 * 1024 }, // 30 MB
 });
 
-const requestBuckets = new Map();
-function routeRateLimit({ windowMs, maxRequests }) {
-  return (req, res, next) => {
-    const now = Date.now();
-    const ip = req.ip || req.connection?.remoteAddress || 'unknown';
-    const routeKey = `${req.method}:${req.path}:${ip}`;
-    const bucket = requestBuckets.get(routeKey);
-
-    if (!bucket || now - bucket.windowStart >= windowMs) {
-      requestBuckets.set(routeKey, { windowStart: now, count: 1 });
-      return next();
-    }
-
-    if (bucket.count >= maxRequests) {
-      return res.status(429).json({ error: 'Too many requests. Please retry shortly.' });
-    }
-
-    bucket.count += 1;
-    return next();
-  };
-}
-
-const writeRouteLimiter = routeRateLimit({ windowMs: 60 * 1000, maxRequests: 30 });
+const writeRouteLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  limit: 30,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many requests. Please retry shortly.' },
+});
 
 // -------------------------------------------------------------
 // GET /api/documents - List documents with filters
