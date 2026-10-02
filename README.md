@@ -1,5 +1,5 @@
 # SecureDocs: Cryptographic Evidence & Case Management System
-### PBL-III: Full-Stack Product Hackathon (03 October 2026)
+### Full-Stack Product Hackathon
 
 ---
 
