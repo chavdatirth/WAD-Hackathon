@@ -25,7 +25,7 @@ function ProtectedRoute({ component: Component }) {
     );
   }
 
-  if (!user && !token) {
+  if (!user || !token) {
     return <Redirect to="/login" />;
   }
 

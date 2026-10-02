@@ -1,14 +1,24 @@
 import { Router } from 'express';
 import crypto from 'node:crypto';
 import multer from 'multer';
+import { rateLimit } from 'express-rate-limit';
 import { SecureDocument } from '../models/Document.js';
 import { Case } from '../models/Case.js';
 import { recordAudit } from '../lib/audit.js';
+import { escapeRegex } from '../lib/escapeRegex.js';
 
 const router = Router();
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 30 * 1024 * 1024 }, // 30 MB
+});
+
+const writeRouteLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  limit: 30,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many requests. Please retry shortly.' },
 });
 
 // -------------------------------------------------------------
@@ -26,7 +36,7 @@ router.get('/', async (req, res) => {
     if (confidentiality && confidentiality !== 'all') query.confidentiality = confidentiality;
 
     if (search) {
-      const regex = new RegExp(search.trim(), 'i');
+      const regex = new RegExp(escapeRegex(search.trim()), 'i');
       query.$or = [
         { documentId: regex },
         { documentName: regex },
@@ -73,7 +83,7 @@ router.get('/:id', async (req, res) => {
 // -------------------------------------------------------------
 // POST /api/documents/upload - Upload new evidentiary document (CRUD: Create)
 // -------------------------------------------------------------
-router.post('/upload', upload.single('file'), async (req, res) => {
+const uploadDocument = async (req, res) => {
   try {
     const {
       caseId,
@@ -154,17 +164,17 @@ router.post('/upload', upload.single('file'), async (req, res) => {
   } catch (err) {
     return res.status(500).json({ error: 'Failed to upload document', details: err.message });
   }
-});
+};
+
+router.post('/upload', writeRouteLimiter, upload.single('file'), uploadDocument);
 
 // Also support POST /api/documents as alias for upload
-router.post('/', upload.single('file'), async (req, res, next) => {
-  return router.handle({ ...req, url: '/upload', originalUrl: req.originalUrl }, res, next);
-});
+router.post('/', writeRouteLimiter, upload.single('file'), uploadDocument);
 
 // -------------------------------------------------------------
 // POST /api/documents/verify - Verify document cryptographic integrity
 // -------------------------------------------------------------
-router.post('/verify', upload.single('file'), async (req, res) => {
+router.post('/verify', writeRouteLimiter, upload.single('file'), async (req, res) => {
   try {
     const { documentId, hash } = req.body;
     let targetDoc = null;
@@ -177,6 +187,10 @@ router.post('/verify', upload.single('file'), async (req, res) => {
     let testHash = hash ? hash.trim().toLowerCase() : '';
     if (req.file && req.file.buffer) {
       testHash = crypto.createHash('sha256').update(req.file.buffer).digest('hex');
+    }
+
+    if (targetDoc && !testHash) {
+      testHash = targetDoc.hash.toLowerCase();
     }
 
     if (!testHash && !targetDoc) {
@@ -207,7 +221,7 @@ router.post('/verify', upload.single('file'), async (req, res) => {
     }
 
     // Direct lookup by hash in the ledger
-    const matchingDoc = await SecureDocument.findOne({ hash: new RegExp(`^${testHash}$`, 'i') });
+    const matchingDoc = await SecureDocument.findOne({ hash: new RegExp(`^${escapeRegex(testHash)}$`, 'i') });
     return res.json({
       verified: !!matchingDoc,
       hash: testHash,
