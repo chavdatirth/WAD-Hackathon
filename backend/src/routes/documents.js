@@ -12,6 +12,30 @@ const upload = multer({
   limits: { fileSize: 30 * 1024 * 1024 }, // 30 MB
 });
 
+const requestBuckets = new Map();
+function routeRateLimit({ windowMs, maxRequests }) {
+  return (req, res, next) => {
+    const now = Date.now();
+    const ip = req.ip || req.connection?.remoteAddress || 'unknown';
+    const routeKey = `${req.method}:${req.path}:${ip}`;
+    const bucket = requestBuckets.get(routeKey);
+
+    if (!bucket || now - bucket.windowStart >= windowMs) {
+      requestBuckets.set(routeKey, { windowStart: now, count: 1 });
+      return next();
+    }
+
+    if (bucket.count >= maxRequests) {
+      return res.status(429).json({ error: 'Too many requests. Please retry shortly.' });
+    }
+
+    bucket.count += 1;
+    return next();
+  };
+}
+
+const writeRouteLimiter = routeRateLimit({ windowMs: 60 * 1000, maxRequests: 30 });
+
 // -------------------------------------------------------------
 // GET /api/documents - List documents with filters
 // -------------------------------------------------------------
@@ -157,15 +181,15 @@ const uploadDocument = async (req, res) => {
   }
 };
 
-router.post('/upload', upload.single('file'), uploadDocument);
+router.post('/upload', writeRouteLimiter, upload.single('file'), uploadDocument);
 
 // Also support POST /api/documents as alias for upload
-router.post('/', upload.single('file'), uploadDocument);
+router.post('/', writeRouteLimiter, upload.single('file'), uploadDocument);
 
 // -------------------------------------------------------------
 // POST /api/documents/verify - Verify document cryptographic integrity
 // -------------------------------------------------------------
-router.post('/verify', upload.single('file'), async (req, res) => {
+router.post('/verify', writeRouteLimiter, upload.single('file'), async (req, res) => {
   try {
     const { documentId, hash } = req.body;
     let targetDoc = null;
