@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { Case } from '../models/Case.js';
 import { SecureDocument } from '../models/Document.js';
 import { recordAudit } from '../lib/audit.js';
+import { escapeRegex } from '../lib/escapeRegex.js';
 import { authenticate } from '../middleware/auth.js';
 
 const router = Router();
@@ -21,7 +22,7 @@ router.get('/', async (req, res) => {
     if (type && type !== 'all') query.type = type;
 
     if (search) {
-      const searchRegex = new RegExp(search.trim(), 'i');
+      const searchRegex = new RegExp(escapeRegex(search.trim()), 'i');
       query.$or = [
         { caseId: searchRegex },
         { title: searchRegex },

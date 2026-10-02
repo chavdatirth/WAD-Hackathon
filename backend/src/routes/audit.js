@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import crypto from 'node:crypto';
 import { AuditLog } from '../models/AuditLog.js';
+import { escapeRegex } from '../lib/escapeRegex.js';
 
 const router = Router();
 
@@ -13,7 +14,7 @@ router.get('/', async (req, res) => {
     const query = {};
 
     if (search) {
-      const regex = new RegExp(search.trim(), 'i');
+      const regex = new RegExp(escapeRegex(search.trim()), 'i');
       query.$or = [
         { action: regex },
         { userName: regex },
