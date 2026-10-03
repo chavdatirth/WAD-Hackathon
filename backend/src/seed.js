@@ -26,7 +26,6 @@ export async function runSeed(force = false) {
     { email: 'amit.shah@securedocs.gov', name: 'Officer Amit Shah', role: 'Officer', department: 'Cyber Crime', employeeId: 'OFF-002', passwordHash },
     { email: 'mehta@securedocs.gov', name: 'Legal Counsel Mehta', role: 'Legal Reviewer', department: 'Legal Department', employeeId: 'LEG-001', passwordHash },
     { email: 'auditor@securedocs.gov', name: 'Auditor Verma', role: 'Auditor', department: 'Compliance & Audit', employeeId: 'AUD-001', passwordHash },
-    { email: 'clerk@securedocs.gov', name: 'Clerk Sharma', role: 'Clerk', department: 'Records', employeeId: 'CLK-001', passwordHash },
   ];
 
   for (const u of users) {
@@ -86,7 +85,7 @@ export async function runSeed(force = false) {
       status: 'Under Review',
       risk: 'Low',
       confidentiality: 'Restricted',
-      createdBy: 'Clerk Sharma',
+      createdBy: 'Officer Raj Patel',
     },
     {
       caseId: 'C-1028',

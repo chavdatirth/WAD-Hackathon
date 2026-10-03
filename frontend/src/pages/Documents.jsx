@@ -15,13 +15,18 @@ import {
 } from 'lucide-react';
 import { documentService } from '../services/documentService';
 import { StatusBadge } from '../components/StatusBadge';
+import { useAuth } from '../context/AuthContext';
 
 export default function Documents() {
+  const { user } = useAuth();
   const [documents, setDocuments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [typeFilter, setTypeFilter] = useState('');
   const [copiedHash, setCopiedHash] = useState('');
+
+  const canUpload = ['Admin', 'Officer'].includes(user?.role);
+  const canDelete = user?.role === 'Admin';
 
   const fetchDocuments = async () => {
     try {
@@ -50,6 +55,10 @@ export default function Documents() {
 
   const handleDelete = async (e, docId) => {
     e.preventDefault();
+    if (!canDelete) {
+      alert('Forbidden: Only Administrators can delete evidence documents.');
+      return;
+    }
     if (!window.confirm(`Delete evidentiary document ${docId}?`)) return;
     try {
       await documentService.deleteDocument(docId);
@@ -71,13 +80,15 @@ export default function Documents() {
             Master repository of cryptographically secured FIRs, forensic reports, and court files
           </p>
         </div>
-        <Link
-          href="/upload"
-          className="flex items-center justify-center gap-2 px-4 py-2.5 bg-cyan-600 hover:bg-cyan-500 text-white rounded-xl text-xs font-bold transition-all shadow-md shadow-cyan-600/20"
-        >
-          <Upload size={16} />
-          Upload New Document
-        </Link>
+        {canUpload && (
+          <Link
+            href="/upload"
+            className="flex items-center justify-center gap-2 px-4 py-2.5 bg-cyan-600 hover:bg-cyan-500 text-white rounded-xl text-xs font-bold transition-all shadow-md shadow-cyan-600/20"
+          >
+            <Upload size={16} />
+            Upload New Document
+          </Link>
+        )}
       </div>
 
       {/* Search & Filter Bar */}
@@ -206,13 +217,15 @@ export default function Documents() {
                         >
                           <Download size={15} />
                         </a>
-                        <button
-                          onClick={(e) => handleDelete(e, doc.documentId)}
-                          className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                          title="Delete Evidence"
-                        >
-                          <Trash2 size={15} />
-                        </button>
+                        {canDelete && (
+                          <button
+                            onClick={(e) => handleDelete(e, doc.documentId)}
+                            className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                            title="Delete Evidence"
+                          >
+                            <Trash2 size={15} />
+                          </button>
+                        )}
                       </div>
                     </td>
                   </tr>

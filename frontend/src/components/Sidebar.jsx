@@ -16,14 +16,17 @@ export function Sidebar() {
   const [location] = useLocation();
   const { user, logout } = useAuth();
 
-  const navItems = [
-    { label: 'Dashboard', path: '/dashboard', icon: LayoutDashboard },
-    { label: 'Cases Repository', path: '/cases', icon: Briefcase },
-    { label: 'Evidence Documents', path: '/documents', icon: FileText },
-    { label: 'Upload Evidence', path: '/upload', icon: Upload },
-    { label: 'Integrity Suite', path: '/integrity', icon: ShieldCheck },
-    { label: 'Cryptographic Audit', path: '/audit', icon: History },
+  const allNavItems = [
+    { label: 'Dashboard', path: '/dashboard', icon: LayoutDashboard, roles: ['Admin', 'Officer', 'Legal Reviewer', 'Auditor'] },
+    { label: 'Cases Repository', path: '/cases', icon: Briefcase, roles: ['Admin', 'Officer', 'Legal Reviewer', 'Auditor'] },
+    { label: 'Evidence Documents', path: '/documents', icon: FileText, roles: ['Admin', 'Officer', 'Legal Reviewer', 'Auditor'] },
+    { label: 'Upload Evidence', path: '/upload', icon: Upload, roles: ['Admin', 'Officer'] },
+    { label: 'Integrity Suite', path: '/integrity', icon: ShieldCheck, roles: ['Admin', 'Officer', 'Legal Reviewer', 'Auditor'] },
+    { label: 'Cryptographic Audit', path: '/audit', icon: History, roles: ['Admin', 'Auditor'] },
   ];
+
+  const currentRole = user?.role || 'Officer';
+  const navItems = allNavItems.filter((item) => item.roles.includes(currentRole));
 
   return (
     <aside className="w-64 bg-[#18263b] text-slate-300 flex flex-col shrink-0 min-h-screen border-r border-slate-800">

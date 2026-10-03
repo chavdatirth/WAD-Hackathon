@@ -15,7 +15,6 @@ const DEMO_USERS = {
   'raj.patel@securedocs.gov': { name: 'Officer Raj Patel', role: 'Officer', department: 'Investigation', employeeId: 'OFF-001' },
   'mehta@securedocs.gov': { name: 'Legal Counsel Mehta', role: 'Legal Reviewer', department: 'Legal Department', employeeId: 'LEG-001' },
   'auditor@securedocs.gov': { name: 'Auditor Verma', role: 'Auditor', department: 'Compliance & Audit', employeeId: 'AUD-001' },
-  'clerk@securedocs.gov': { name: 'Clerk Sharma', role: 'Clerk', department: 'Records', employeeId: 'CLK-001' },
 };
 
 // -------------------------------------------------------------
@@ -43,7 +42,7 @@ router.post('/login', async (req, res) => {
     // Auto-create or verify demo users if not present
     if (!user) {
       const demo = DEMO_USERS[loginId];
-      if (demo && (password === 'password123' || password === 'admin123' || password === 'SecureDocs@2026')) {
+      if (demo && (password === 'password123' || password === 'admin123')) {
         const hash = await bcrypt.hash(password, 10);
         user = await User.create({
           email: loginId.includes('@') ? loginId : `${loginId}@securedocs.gov`,
@@ -55,12 +54,12 @@ router.post('/login', async (req, res) => {
           isActive: true,
         });
       } else {
-        return res.status(401).json({ error: 'Invalid credentials. Please verify email and password.' });
+        return res.status(401).json({ message: 'Authentication required: Invalid credentials. Please verify email and password.' });
       }
     } else {
       const isMatch = await bcrypt.compare(password, user.passwordHash);
-      if (!isMatch && password !== 'password123' && password !== 'SecureDocs@2026') {
-        return res.status(401).json({ error: 'Invalid credentials. Incorrect password.' });
+      if (!isMatch && password !== 'password123') {
+        return res.status(401).json({ message: 'Authentication required: Invalid credentials. Incorrect password.' });
       }
     }
 
@@ -105,11 +104,11 @@ router.post('/login', async (req, res) => {
 });
 
 // -------------------------------------------------------------
-// POST /api/auth/register
+// POST /api/auth/register - Secure registration (no self-assigned Admin)
 // -------------------------------------------------------------
 router.post('/register', async (req, res) => {
   try {
-    const { name, email, password, role = 'Officer', department = 'Investigation', employeeId } = req.body;
+    const { name, email, password, department = 'Investigation', employeeId } = req.body;
 
     if (!name || !email || !password) {
       return res.status(400).json({ error: 'Name, email, and password are required' });
@@ -120,12 +119,15 @@ router.post('/register', async (req, res) => {
       return res.status(409).json({ error: 'An account with this email already exists' });
     }
 
+    // Security Rule: Public self-registration ALWAYS creates 'Officer' role. Admin/Auditor/Legal Reviewer cannot be self-assigned.
+    const assignedRole = 'Officer';
+
     const passwordHash = await bcrypt.hash(password, 10);
     const user = await User.create({
       name: name.trim(),
       email: email.toLowerCase().trim(),
-      role,
-      department,
+      role: assignedRole,
+      department: department.trim(),
       employeeId: employeeId || `EMP-${Math.floor(100 + Math.random() * 900)}`,
       passwordHash,
       isActive: true,
@@ -149,7 +151,7 @@ router.post('/register', async (req, res) => {
       userId: user._id.toString(),
       userName: user.name,
       userRole: user.role,
-      details: `New account registered for ${user.email} with role ${user.role}`,
+      details: `New account registered for ${user.email} with standard role ${user.role}`,
       result: 'Success',
     });
 

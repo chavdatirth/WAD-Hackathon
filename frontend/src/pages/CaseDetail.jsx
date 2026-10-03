@@ -19,8 +19,10 @@ import { caseService } from '../services/caseService';
 import { documentService } from '../services/documentService';
 import { StatusBadge } from '../components/StatusBadge';
 import { Modal } from '../components/Modal';
+import { useAuth } from '../context/AuthContext';
 
 export default function CaseDetail() {
+  const { user } = useAuth();
   const [, params] = useRoute('/cases/:id');
   const caseId = params?.id;
 
@@ -31,6 +33,12 @@ export default function CaseDetail() {
   const [isEditingStatus, setIsEditingStatus] = useState(false);
   const [selectedStatus, setSelectedStatus] = useState('');
   const [selectedPriority, setSelectedPriority] = useState('');
+
+  // Permissions
+  const canUpload = ['Admin', 'Officer'].includes(user?.role);
+  const canEditAll = ['Admin', 'Officer'].includes(user?.role);
+  const canEditLegalStatus = user?.role === 'Legal Reviewer';
+  const canModifyState = canEditAll || canEditLegalStatus;
 
   // Quick Upload Modal state
   const [isUploadOpen, setIsUploadOpen] = useState(false);
@@ -60,10 +68,11 @@ export default function CaseDetail() {
 
   const handleUpdateStatus = async () => {
     try {
-      const updated = await caseService.updateCase(caseData.caseId, {
-        status: selectedStatus,
-        priority: selectedPriority,
-      });
+      const payload = canEditLegalStatus
+        ? { status: selectedStatus }
+        : { status: selectedStatus, priority: selectedPriority };
+
+      const updated = await caseService.updateCase(caseData.caseId, payload);
       setCaseData(updated);
       setIsEditingStatus(false);
     } catch (err) {
@@ -73,6 +82,10 @@ export default function CaseDetail() {
 
   const handleQuickUpload = async (e) => {
     e.preventDefault();
+    if (!canUpload) {
+      alert('Forbidden: Your role is not authorized to upload evidence.');
+      return;
+    }
     if (!uploadName && !uploadFile) {
       alert('Please provide a document title or select a file');
       return;
@@ -129,13 +142,15 @@ export default function CaseDetail() {
         >
           <ArrowLeft size={16} /> Back to Cases
         </Link>
-        <button
-          onClick={() => setIsUploadOpen(true)}
-          className="flex items-center gap-2 px-4 py-2 bg-cyan-600 hover:bg-cyan-500 text-white rounded-xl text-xs font-bold transition-all shadow-md shadow-cyan-600/20"
-        >
-          <Upload size={14} />
-          Attach Evidentiary Document
-        </button>
+        {canUpload && (
+          <button
+            onClick={() => setIsUploadOpen(true)}
+            className="flex items-center gap-2 px-4 py-2 bg-cyan-600 hover:bg-cyan-500 text-white rounded-xl text-xs font-bold transition-all shadow-md shadow-cyan-600/20"
+          >
+            <Upload size={14} />
+            Attach Evidentiary Document
+          </button>
+        )}
       </div>
 
       {/* Case Header Card */}
@@ -154,59 +169,63 @@ export default function CaseDetail() {
             <p className="text-xs text-slate-500 mt-1 max-w-2xl">{caseData.description || 'No description provided'}</p>
           </div>
 
-          {/* Status Quick Updater */}
-          <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200 shrink-0">
-            <div className="text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-2">
-              Case State Controls
-            </div>
-            {isEditingStatus ? (
-              <div className="space-y-2">
-                <select
-                  value={selectedStatus}
-                  onChange={(e) => setSelectedStatus(e.target.value)}
-                  className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-bold text-slate-800"
-                >
-                  <option value="Active">Active</option>
-                  <option value="Under Investigation">Under Investigation</option>
-                  <option value="Under Review">Under Review</option>
-                  <option value="Closed">Closed</option>
-                </select>
-
-                <select
-                  value={selectedPriority}
-                  onChange={(e) => setSelectedPriority(e.target.value)}
-                  className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-bold text-slate-800"
-                >
-                  <option value="High">High Priority</option>
-                  <option value="Medium">Medium Priority</option>
-                  <option value="Low">Low Priority</option>
-                </select>
-
-                <div className="flex gap-2 pt-1">
-                  <button
-                    onClick={handleUpdateStatus}
-                    className="flex-1 py-1 bg-cyan-600 hover:bg-cyan-500 text-white rounded-lg text-xs font-bold"
-                  >
-                    Save
-                  </button>
-                  <button
-                    onClick={() => setIsEditingStatus(false)}
-                    className="px-2 py-1 bg-slate-200 text-slate-600 rounded-lg text-xs font-bold"
-                  >
-                    Cancel
-                  </button>
-                </div>
+          {/* Status Quick Updater (Visible for Admin, Officer, Legal Reviewer) */}
+          {canModifyState && (
+            <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200 shrink-0">
+              <div className="text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-2">
+                {canEditLegalStatus ? 'Legal Review Controls' : 'Case State Controls'}
               </div>
-            ) : (
-              <button
-                onClick={() => setIsEditingStatus(true)}
-                className="w-full flex items-center justify-center gap-1.5 px-3 py-1.5 bg-white border border-slate-200 hover:bg-slate-100 rounded-lg text-xs font-bold text-slate-700 transition-colors"
-              >
-                <Edit size={12} />
-                Change Status / Priority
-              </button>
-            )}
-          </div>
+              {isEditingStatus ? (
+                <div className="space-y-2">
+                  <select
+                    value={selectedStatus}
+                    onChange={(e) => setSelectedStatus(e.target.value)}
+                    className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-bold text-slate-800"
+                  >
+                    <option value="Active">Active</option>
+                    <option value="Under Investigation">Under Investigation</option>
+                    <option value="Under Review">Under Review</option>
+                    <option value="Closed">Closed</option>
+                  </select>
+
+                  {canEditAll && (
+                    <select
+                      value={selectedPriority}
+                      onChange={(e) => setSelectedPriority(e.target.value)}
+                      className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-bold text-slate-800"
+                    >
+                      <option value="High">High Priority</option>
+                      <option value="Medium">Medium Priority</option>
+                      <option value="Low">Low Priority</option>
+                    </select>
+                  )}
+
+                  <div className="flex gap-2 pt-1">
+                    <button
+                      onClick={handleUpdateStatus}
+                      className="flex-1 py-1 bg-cyan-600 hover:bg-cyan-500 text-white rounded-lg text-xs font-bold"
+                    >
+                      Save
+                    </button>
+                    <button
+                      onClick={() => setIsEditingStatus(false)}
+                      className="px-2 py-1 bg-slate-200 text-slate-600 rounded-lg text-xs font-bold"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <button
+                  onClick={() => setIsEditingStatus(true)}
+                  className="w-full flex items-center justify-center gap-1.5 px-3 py-1.5 bg-white border border-slate-200 hover:bg-slate-100 rounded-lg text-xs font-bold text-slate-700 transition-colors"
+                >
+                  <Edit size={12} />
+                  {canEditLegalStatus ? 'Review Legal Status' : 'Change Status / Priority'}
+                </button>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Metadata Details */}
@@ -243,26 +262,30 @@ export default function CaseDetail() {
               Tamper-evident documents cryptographically bound to Case {caseData.caseId}
             </p>
           </div>
-          <button
-            onClick={() => setIsUploadOpen(true)}
-            className="text-xs font-bold text-cyan-600 hover:text-cyan-500 flex items-center gap-1"
-          >
-            <Upload size={14} /> Add Evidence
-          </button>
+          {canUpload && (
+            <button
+              onClick={() => setIsUploadOpen(true)}
+              className="text-xs font-bold text-cyan-600 hover:text-cyan-500 flex items-center gap-1"
+            >
+              <Upload size={14} /> Add Evidence
+            </button>
+          )}
         </div>
 
         {documents.length === 0 ? (
           <div className="p-12 text-center text-xs text-slate-400">
             <FileText size={32} className="mx-auto text-slate-300 mb-2" />
             No evidentiary documents attached to this case yet.
-            <div className="mt-3">
-              <button
-                onClick={() => setIsUploadOpen(true)}
-                className="px-4 py-2 bg-slate-900 text-white rounded-xl text-xs font-bold"
-              >
-                Upload First Document
-              </button>
-            </div>
+            {canUpload && (
+              <div className="mt-3">
+                <button
+                  onClick={() => setIsUploadOpen(true)}
+                  className="px-4 py-2 bg-slate-900 text-white rounded-xl text-xs font-bold"
+                >
+                  Upload First Document
+                </button>
+              </div>
+            )}
           </div>
         ) : (
           <div className="divide-y divide-slate-100">
